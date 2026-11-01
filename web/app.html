@@ -1,0 +1,858 @@
+<!doctype html>
+<html lang="hu">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>Vivid</title>
+<style>
+:root {
+  --bg: #121417; --panel: #1b1e23; --panel2: #23272e; --line: #2f343c; --text: #e6e8eb; --muted: #9aa3ad;
+  --accent: #f0a531; --accent-ink: #1b1300; --err: #ff6b6b; --ok: #6bd49a; --sel: #33404f;
+  --mono: ui-monospace, "Roboto Mono", "Droid Sans Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #f4f2ee; --panel: #ffffff; --panel2: #ebe8e2; --line: #d8d3ca; --text: #1d1f22; --muted: #6b6f75;
+    --accent: #c27400; --accent-ink: #ffffff; --err: #c62828; --ok: #2e7d32; --sel: #ffe2b3;
+  }
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+  font: 15px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; overflow: hidden; }
+button { font: inherit; color: inherit; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px;
+  padding: 7px 12px; min-height: 38px; cursor: pointer; }
+button:active { filter: brightness(1.25); }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+button.ghost { background: transparent; border-color: transparent; }
+button:disabled { opacity: .45; }
+select, input[type=text] { font: inherit; color: var(--text); background: var(--panel2); border: 1px solid var(--line);
+  border-radius: 8px; padding: 7px 8px; min-height: 38px; }
+#app { display: flex; flex-direction: column; height: 100%; }
+header { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: var(--panel); border-bottom: 1px solid var(--line); }
+header .title { font-weight: 700; letter-spacing: .5px; }
+header .title span { color: var(--accent); }
+header .file { flex: 1; min-width: 0; color: var(--muted); font-family: var(--mono); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+header .file b { color: var(--text); font-weight: 600; }
+.dirty::after { content: " ●"; color: var(--accent); }
+nav { display: flex; background: var(--panel); border-bottom: 1px solid var(--line); }
+nav button { flex: 1; border: 0; border-radius: 0; background: transparent; border-bottom: 2px solid transparent; color: var(--muted); min-height: 42px; }
+nav button.on { color: var(--text); border-bottom-color: var(--accent); }
+nav .badge { display: inline-block; min-width: 18px; padding: 0 5px; border-radius: 9px; background: var(--err); color: #fff; font-size: 11px; margin-left: 4px; }
+main { flex: 1; min-height: 0; position: relative; }
+.view { position: absolute; inset: 0; display: none; flex-direction: column; }
+.view.on { display: flex; }
+.bar { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--line); background: var(--panel); align-items: center; }
+.bar .grow { flex: 1; }
+.scroll { flex: 1; overflow: auto; -webkit-overflow-scrolling: touch; }
+/* files */
+.group { padding: 4px 0 8px; }
+.group h3 { margin: 10px 12px 4px; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
+.frow { display: flex; align-items: center; gap: 8px; padding: 0 6px 0 12px; border-bottom: 1px solid var(--line); min-height: 48px; }
+.frow .nm { flex: 1; font-family: var(--mono); font-size: 14px; padding: 12px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.frow .sz { color: var(--muted); font-size: 12px; }
+.frow.cur { background: var(--sel); }
+.empty { padding: 24px 16px; color: var(--muted); }
+/* editor */
+#ed { flex: 1; width: 100%; resize: none; border: 0; outline: none; padding: 10px 10px 40vh; margin: 0;
+  background: var(--bg); color: var(--text); font: 13.5px/1.5 var(--mono); white-space: pre; overflow: auto; tab-size: 4; }
+#edstat { padding: 4px 10px; font-size: 12px; color: var(--muted); border-top: 1px solid var(--line); background: var(--panel); display: flex; gap: 12px; }
+/* image */
+#imgwrap { flex: 1; overflow: auto; display: flex; align-items: flex-start; justify-content: center; padding: 10px; background: repeating-conic-gradient(var(--panel) 0 25%, var(--bg) 0 50%) 0 0/20px 20px; }
+#cv { width: 100%; max-width: 1400px; height: auto; background: #000; box-shadow: 0 2px 12px rgba(0,0,0,.4); }
+#cv.full { width: auto; max-width: none; }
+#prog { height: 4px; background: var(--line); }
+#prog div { height: 100%; width: 0; background: var(--accent); transition: width .15s; }
+#imginfo { padding: 6px 10px; font-size: 12px; color: var(--muted); border-top: 1px solid var(--line); background: var(--panel); min-height: 28px; }
+.opts { display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; padding: 10px; align-items: center; background: var(--panel); border-bottom: 1px solid var(--line); }
+.opts label { font-size: 13px; color: var(--muted); }
+.opts .chk { grid-column: 1 / -1; display: flex; gap: 16px; flex-wrap: wrap; }
+.opts .chk label { color: var(--text); display: flex; align-items: center; gap: 6px; }
+details.optbox > summary { list-style: none; padding: 8px 10px; background: var(--panel); border-bottom: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+details.optbox > summary::before { content: "▸ "; }
+details.optbox[open] > summary::before { content: "▾ "; }
+/* log */
+#log { padding: 8px 0; font: 13px/1.45 var(--mono); }
+#log .ln { padding: 6px 12px; border-bottom: 1px solid var(--line); white-space: pre-wrap; word-break: break-word; }
+#log .err { color: var(--err); }
+#log .ok { color: var(--ok); }
+#log .warn { color: var(--accent); }
+#log a { color: inherit; text-decoration: underline; }
+/* modal */
+#modal { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: none; align-items: flex-end; justify-content: center; z-index: 10; }
+#modal.on { display: flex; }
+#modal .box { background: var(--panel); width: 100%; max-width: 560px; max-height: 85%; overflow: auto; border-radius: 14px 14px 0 0; padding: 14px; }
+#modal h2 { margin: 0 0 10px; font-size: 17px; }
+#modal .msg { color: var(--muted); margin: 0 0 12px; white-space: pre-wrap; }
+#modal .btns { display: flex; flex-direction: column; gap: 8px; }
+#modal .btns button { width: 100%; text-align: left; }
+#modal .row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
+#modal input[type=text] { width: 100%; }
+#help { font-size: 13.5px; }
+#help code, #help pre { font-family: var(--mono); font-size: 12.5px; }
+#help pre { background: var(--bg); padding: 8px; border-radius: 6px; overflow: auto; }
+#help h4 { margin: 14px 0 4px; color: var(--accent); }
+#toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--panel2); border: 1px solid var(--line);
+  padding: 10px 16px; border-radius: 20px; display: none; z-index: 20; max-width: 90%; text-align: center; font-size: 14px; }
+#toast.on { display: block; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="title">VIVID<span>2</span></div>
+    <div class="file" id="hfile">–</div>
+    <button id="bSave" title="Mentés">Mentés</button>
+    <button id="bRender" class="primary" title="Renderelés">▶</button>
+  </header>
+  <nav>
+    <button data-v="files" class="on">Fájlok</button>
+    <button data-v="edit">Szerkesztő</button>
+    <button data-v="image">Kép</button>
+    <button data-v="log">Napló<span id="logbadge"></span></button>
+  </nav>
+  <main>
+    <section class="view on" id="v-files">
+      <div class="bar">
+        <button id="bNew">+ Új</button>
+        <button id="bImport">Importálás (ZIP / fájl)</button>
+        <span class="grow"></span>
+        <button id="bMore" class="ghost">⋯</button>
+      </div>
+      <div class="scroll" id="flist"></div>
+    </section>
+    <section class="view" id="v-edit">
+      <div class="bar">
+        <button id="bGoto">Sor…</button>
+        <button id="bFind">Keresés…</button>
+        <button id="bHelp">Súgó</button>
+        <span class="grow"></span>
+        <button id="bFont" class="ghost">A±</button>
+      </div>
+      <textarea id="ed" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" wrap="off"></textarea>
+      <div id="edstat"><span id="pos">1:1</span><span id="edinfo"></span></div>
+    </section>
+    <section class="view" id="v-image">
+      <div class="bar">
+        <button id="bRender2" class="primary">▶ Render</button>
+        <button id="bStop" disabled>■ Stop</button>
+        <span class="grow"></span>
+        <button id="bZoom" class="ghost">1:1</button>
+        <button id="bPng">PNG mentése</button>
+      </div>
+      <details class="optbox" id="optbox">
+        <summary>Render-beállítások</summary>
+        <div class="opts">
+          <label for="oRes">Felbontás</label>
+          <select id="oRes">
+            <option value="studio">a studio blokk szerint</option>
+            <option value="160x100">160 × 100 (gyors előnézet)</option>
+            <option value="320x200">320 × 200</option>
+            <option value="640x400">640 × 400</option>
+            <option value="800x500">800 × 500</option>
+            <option value="1024x640">1024 × 640</option>
+            <option value="1280x800">1280 × 800</option>
+            <option value="1920x1200">1920 × 1200</option>
+            <option value="640x480">640 × 480 (4:3)</option>
+            <option value="1024x768">1024 × 768 (4:3)</option>
+          </select>
+          <label for="oAA">Élsimítás</label>
+          <select id="oAA">
+            <option value="studio">a studio blokk szerint</option>
+            <option value="none">none</option>
+            <option value="quick">quick</option>
+            <option value="corners">corners</option>
+            <option value="adaptive">adaptive</option>
+          </select>
+          <div class="chk">
+            <label><input type="checkbox" id="oSquare" checked> négyzetes pixelek</label>
+            <label><input type="checkbox" id="oNoShadow"> árnyékok ki</label>
+          </div>
+        </div>
+      </details>
+      <div id="prog"><div></div></div>
+      <div id="imgwrap"><canvas id="cv" width="320" height="200"></canvas></div>
+      <div id="imginfo">Még nincs renderelt kép.</div>
+    </section>
+    <section class="view" id="v-log">
+      <div class="bar"><span class="grow" style="color:var(--muted);font-size:13px">Hibák és figyelmeztetések</span><button id="bClearLog" class="ghost">Törlés</button></div>
+      <div class="scroll"><div id="log"></div></div>
+    </section>
+  </main>
+</div>
+<div id="modal"><div class="box" id="mbox"></div></div>
+<div id="toast"></div>
+<input type="file" id="fileIn" multiple style="display:none">
+
+<script type="text/plain" id="renderer-src">/*__RENDERER__*/</script>
+<script>var SAMPLES = /*__SAMPLES__*/{};</script>
+<script>
+'use strict';
+// ------------------------------------------------------------------ storage
+var LS_PREFIX = 'vivid:file:';
+var store = (function () {
+  var A = window.Android;
+  if (A && A.listFiles) {
+    return {
+      list: function () { try { return JSON.parse(A.listFiles() || '[]'); } catch (e) { return []; } },
+      read: function (n) { var s = A.readFile(n); return s == null ? null : String(s); },
+      write: function (n, c) { return !!A.writeFile(n, c); },
+      del: function (n) { return !!A.deleteFile(n); },
+      native: true
+    };
+  }
+  return {
+    list: function () { var r = []; for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k.indexOf(LS_PREFIX) === 0) r.push(k.substr(LS_PREFIX.length)); } return r; },
+    read: function (n) { return localStorage.getItem(LS_PREFIX + n); },
+    write: function (n, c) { try { localStorage.setItem(LS_PREFIX + n, c); return true; } catch (e) { return false; } },
+    del: function (n) { localStorage.removeItem(LS_PREFIX + n); return true; },
+    native: false
+  };
+})();
+function pref(k, v) {
+  try { if (v === undefined) return localStorage.getItem('vivid:pref:' + k); localStorage.setItem('vivid:pref:' + k, v); } catch (e) { return null; }
+}
+
+// ------------------------------------------------------------------ helpers
+var $ = function (id) { return document.getElementById(id); };
+function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+function ext(n) { var m = /\.([^.]+)$/.exec(n); return m ? m[1].toLowerCase() : ''; }
+function isScene(n) { return ext(n) === 'v'; }
+var toastT;
+function toast(msg, ms) { var t = $('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(function () { t.classList.remove('on'); }, ms || 2500); }
+function validName(n) { return /^[A-Za-z0-9_][A-Za-z0-9_.\-]{0,63}$/.test(n) && n.indexOf('..') < 0; }
+function fmtSize(n) { return n < 1024 ? n + ' B' : (n / 1024).toFixed(n < 10240 ? 1 : 0) + ' KB'; }
+
+// ------------------------------------------------------------------ modal
+var modalResolve = null;
+function closeModal(v) { $('modal').classList.remove('on'); var r = modalResolve; modalResolve = null; if (r) r(v); }
+function modal(html, setup) {
+  return new Promise(function (res) {
+    if (modalResolve) closeModal(null);
+    modalResolve = res;
+    $('mbox').innerHTML = html;
+    $('modal').classList.add('on');
+    if (setup) setup($('mbox'));
+  });
+}
+$('modal').addEventListener('click', function (e) { if (e.target.id === 'modal') closeModal(null); });
+function choose(title, items, msg) {
+  return modal('<h2>' + esc(title) + '</h2>' + (msg ? '<p class="msg">' + esc(msg) + '</p>' : '') + '<div class="btns">' +
+    items.map(function (it, i) { return '<button data-i="' + i + '"' + (it.primary ? ' class="primary"' : '') + '>' + esc(it.label) + '</button>'; }).join('') +
+    '<button data-i="-1" class="ghost">Mégse</button></div>', function (box) {
+      box.querySelectorAll('button[data-i]').forEach(function (b) {
+        b.onclick = function () { var i = +b.getAttribute('data-i'); closeModal(i < 0 ? null : items[i].value); };
+      });
+    });
+}
+function ask(title, label, value) {
+  return modal('<h2>' + esc(title) + '</h2><p class="msg">' + esc(label) + '</p><input type="text" id="mIn" autocapitalize="off" autocorrect="off" spellcheck="false" value="' + esc(value || '') +
+    '"><div class="row"><button class="ghost" id="mNo">Mégse</button><button class="primary" id="mOk">OK</button></div>', function (box) {
+      var inp = $('mIn'); setTimeout(function () { inp.focus(); inp.select(); }, 50);
+      $('mOk').onclick = function () { closeModal(inp.value.trim()); };
+      $('mNo').onclick = function () { closeModal(null); };
+      inp.onkeydown = function (e) { if (e.key === 'Enter') closeModal(inp.value.trim()); };
+    });
+}
+function confirmBox(title, msg, okLabel) {
+  return choose(title, [{ label: okLabel || 'OK', value: true, primary: true }], msg).then(function (v) { return !!v; });
+}
+
+// ------------------------------------------------------------------ state
+var cur = null;          // currently open file name
+var curSaved = '';       // last saved content of the open file
+var lastScene = pref('lastScene') || null;
+var ed = $('ed');
+
+function fileList() { return store.list().sort(function (a, b) { return a.toLowerCase() < b.toLowerCase() ? -1 : 1; }); }
+function isDirty() { return cur !== null && ed.value !== curSaved; }
+function updateHeader() {
+  var h = $('hfile');
+  h.innerHTML = cur ? '<b>' + esc(cur) + '</b>' : '–';
+  h.classList.toggle('dirty', isDirty());
+  $('bSave').disabled = !cur;
+}
+
+// ------------------------------------------------------------------ views
+var currentView = 'files';
+function show(v) {
+  currentView = v;
+  document.querySelectorAll('nav button').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-v') === v); });
+  document.querySelectorAll('.view').forEach(function (s) { s.classList.toggle('on', s.id === 'v-' + v); });
+  if (v === 'files') renderFiles();
+}
+document.querySelectorAll('nav button').forEach(function (b) { b.onclick = function () { show(b.getAttribute('data-v')); }; });
+
+// ------------------------------------------------------------------ file list
+var GROUPS = [
+  { title: 'Jelenetek (.v)', test: function (e) { return e === 'v'; } },
+  { title: 'Include fájlok (.vo, .vc, .vs)', test: function (e) { return e === 'vo' || e === 'vc' || e === 'vs'; } },
+  { title: 'Paletták (.map)', test: function (e) { return e === 'map'; } },
+  { title: 'Egyéb / dokumentáció', test: function () { return true; } }
+];
+function renderFiles() {
+  var names = fileList(), used = {}, html = '';
+  if (!names.length) {
+    $('flist').innerHTML = '<div class="empty">Nincsenek fájlok. Az „Importálás” gombbal betöltheted a vivid2.zip összes példáját, vagy a ⋯ menüben visszaállíthatod a beépített mintákat.</div>';
+    return;
+  }
+  GROUPS.forEach(function (g) {
+    var list = names.filter(function (n) { return !used[n] && g.test(ext(n)); });
+    if (!list.length) return;
+    list.forEach(function (n) { used[n] = 1; });
+    html += '<div class="group"><h3>' + esc(g.title) + '</h3>' + list.map(function (n) {
+      return '<div class="frow' + (n === cur ? ' cur' : '') + '" data-n="' + esc(n) + '"><div class="nm">' + esc(n) + '</div>' +
+        (isScene(n) ? '<button class="ghost" data-act="render" title="Renderelés">▶</button>' : '') +
+        '<button class="ghost" data-act="menu" title="Műveletek">⋯</button></div>';
+    }).join('') + '</div>';
+  });
+  $('flist').innerHTML = html;
+}
+$('flist').addEventListener('click', function (e) {
+  var row = e.target.closest('.frow'); if (!row) return;
+  var n = row.getAttribute('data-n'), act = e.target.getAttribute('data-act');
+  if (act === 'render') { openFile(n).then(function (ok) { if (ok) { show('image'); startRender(); } }); return; }
+  if (act === 'menu') { fileMenu(n); return; }
+  openFile(n).then(function (ok) { if (ok) show('edit'); });
+});
+
+function fileMenu(n) {
+  var items = [{ label: 'Megnyitás', value: 'open' }];
+  if (isScene(n)) items.push({ label: 'Renderelés', value: 'render' });
+  items.push({ label: 'Átnevezés', value: 'rename' }, { label: 'Másolat készítése', value: 'copy' },
+             { label: 'Exportálás a Letöltések mappába', value: 'export' }, { label: 'Törlés', value: 'delete' });
+  var c = store.read(n);
+  choose(n, items, c != null ? fmtSize(c.length) + ', ' + c.split('\n').length + ' sor' : '').then(function (a) {
+    if (!a) return;
+    if (a === 'open') openFile(n).then(function (ok) { if (ok) show('edit'); });
+    else if (a === 'render') openFile(n).then(function (ok) { if (ok) { show('image'); startRender(); } });
+    else if (a === 'rename') renameFile(n);
+    else if (a === 'copy') copyFile(n);
+    else if (a === 'export') exportText(n, n === cur ? ed.value : store.read(n));
+    else if (a === 'delete') deleteFile(n);
+  });
+}
+
+function guardUnsaved() {
+  if (!isDirty()) return Promise.resolve(true);
+  return choose('Nem mentett módosítás', [
+    { label: 'Mentés', value: 'save', primary: true }, { label: 'Elvetés', value: 'discard' }
+  ], cur + ' módosult. Mi legyen vele?').then(function (a) {
+    if (a === 'save') return saveCurrent();
+    if (a === 'discard') { ed.value = curSaved; updateHeader(); return true; }
+    return false;
+  });
+}
+
+function openFile(n, line) {
+  if (n === cur) { if (line) gotoLine(line); return Promise.resolve(true); }
+  return guardUnsaved().then(function (ok) {
+    if (!ok) return false;
+    var c = store.read(n);
+    if (c == null) { toast('Nem olvasható: ' + n); return false; }
+    cur = n; curSaved = c; ed.value = c;
+    if (isScene(n)) { lastScene = n; pref('lastScene', n); }
+    pref('lastOpen', n);
+    ed.scrollTop = 0; ed.setSelectionRange(0, 0);
+    updateHeader(); updatePos();
+    if (line) setTimeout(function () { gotoLine(line); }, 30);
+    return true;
+  });
+}
+function saveCurrent() {
+  if (!cur) return Promise.resolve(false);
+  if (store.write(cur, ed.value)) { curSaved = ed.value; updateHeader(); toast('Mentve: ' + cur); return Promise.resolve(true); }
+  toast('Mentési hiba!'); return Promise.resolve(false);
+}
+$('bSave').onclick = saveCurrent;
+
+function newFile() {
+  ask('Új fájl', 'Fájlnév (pl. jelenet.v, targy.vo)', 'uj.v').then(function (n) {
+    if (!n) return;
+    if (!validName(n)) { toast('Érvénytelen fájlnév'); return; }
+    if (store.read(n) != null) { toast('Már létezik: ' + n); return; }
+    var tpl = isScene(n) ? TEMPLATE : '// ' + n + '\n';
+    store.write(n, tpl);
+    openFile(n).then(function () { show('edit'); });
+  });
+}
+$('bNew').onclick = newFile;
+function renameFile(n) {
+  ask('Átnevezés', 'Új név', n).then(function (nn) {
+    if (!nn || nn === n) return;
+    if (!validName(nn)) { toast('Érvénytelen fájlnév'); return; }
+    if (store.read(nn) != null) { toast('Már létezik: ' + nn); return; }
+    var c = n === cur ? ed.value : store.read(n);
+    if (!store.write(nn, c)) { toast('Hiba'); return; }
+    store.del(n);
+    if (n === cur) { cur = nn; curSaved = c; updateHeader(); }
+    if (lastScene === n) { lastScene = nn; pref('lastScene', nn); }
+    renderFiles();
+  });
+}
+function copyFile(n) {
+  var base = n.replace(/(\.[^.]+)?$/, ''), e = /\.[^.]+$/.exec(n); e = e ? e[0] : '';
+  var cand = base + '_masolat' + e, i = 2;
+  while (store.read(cand) != null) cand = base + '_masolat' + (i++) + e;
+  ask('Másolat', 'A másolat neve', cand).then(function (nn) {
+    if (!nn) return;
+    if (!validName(nn) || store.read(nn) != null) { toast('Érvénytelen vagy foglalt név'); return; }
+    store.write(nn, n === cur ? ed.value : store.read(n)); renderFiles(); toast('Kész: ' + nn);
+  });
+}
+function deleteFile(n) {
+  confirmBox('Törlés', n + ' véglegesen törlődik.', 'Törlés').then(function (ok) {
+    if (!ok) return;
+    store.del(n);
+    if (n === cur) { cur = null; curSaved = ''; ed.value = ''; updateHeader(); }
+    renderFiles();
+  });
+}
+
+$('bMore').onclick = function () {
+  choose('Továbbiak', [
+    { label: 'Beépített minták visszaállítása', value: 'samples' },
+    { label: 'Mentett PNG-k helye: Képek/Vivid', value: 'info' },
+    { label: 'Névjegy', value: 'about' }
+  ]).then(function (a) {
+    if (a === 'samples') installSamples(true);
+    else if (a === 'about') modal('<h2>Vivid 2 Androidra</h2><p class="msg">A Vivid 2.0 (© 1989–1992 Stephen B. Coy) jelenetleíró nyelvének újraimplementált renderelője, szerkesztővel.\n\nA Vivid eredeti példafájljai a vivid2.zip importálásával tölthetők be (Fájlok → Importálás).\n\nPort: Sisak László (helmetsoft.com)</p><div class="row"><button class="primary" onclick="closeModal()">OK</button></div>');
+  });
+};
+
+function installSamples(force) {
+  var n = 0;
+  for (var k in SAMPLES) {
+    if (force || store.read(k) == null) { store.write(k, SAMPLES[k]); n++; }
+  }
+  if (force) toast(n + ' minta visszaállítva');
+  renderFiles();
+}
+
+// ------------------------------------------------------------------ editor
+function updatePos() {
+  var p = ed.selectionStart, before = ed.value.substring(0, p);
+  var line = before.split('\n').length, col = p - before.lastIndexOf('\n');
+  $('pos').textContent = 'sor ' + line + ', oszlop ' + col;
+  $('edinfo').textContent = ed.value.split('\n').length + ' sor';
+}
+ed.addEventListener('input', function () { updateHeader(); });
+['keyup', 'click', 'select', 'input'].forEach(function (ev) { ed.addEventListener(ev, updatePos); });
+ed.addEventListener('keydown', function (e) {
+  if (e.key === 'Tab') { e.preventDefault(); insertAtCursor('    '); }
+});
+function insertAtCursor(s) {
+  var a = ed.selectionStart, b = ed.selectionEnd;
+  ed.setRangeText ? ed.setRangeText(s, a, b, 'end') : (ed.value = ed.value.slice(0, a) + s + ed.value.slice(b));
+  updateHeader(); updatePos();
+}
+function gotoLine(line) {
+  var lines = ed.value.split('\n'); line = Math.max(1, Math.min(lines.length, line));
+  var idx = 0; for (var i = 0; i < line - 1; i++) idx += lines[i].length + 1;
+  show('edit');
+  ed.focus();
+  ed.setSelectionRange(idx, idx + lines[line - 1].length);
+  var lh = parseFloat(getComputedStyle(ed).lineHeight) || 20;
+  ed.scrollTop = Math.max(0, (line - 1) * lh - ed.clientHeight / 3);
+  updatePos();
+}
+$('bGoto').onclick = function () {
+  ask('Ugrás sorra', 'Sor száma', '').then(function (v) { if (v && +v > 0) gotoLine(+v); });
+};
+var lastFind = '';
+$('bFind').onclick = function () {
+  ask('Keresés', 'Keresett szöveg (a kurzortól előre, körbe)', lastFind).then(function (q) {
+    if (!q) return; lastFind = q;
+    var v = ed.value, from = ed.selectionEnd, i = v.toLowerCase().indexOf(q.toLowerCase(), from);
+    if (i < 0) i = v.toLowerCase().indexOf(q.toLowerCase());
+    if (i < 0) { toast('Nincs találat'); return; }
+    var line = v.substring(0, i).split('\n').length;
+    show('edit'); ed.focus(); ed.setSelectionRange(i, i + q.length);
+    var lh = parseFloat(getComputedStyle(ed).lineHeight) || 20;
+    ed.scrollTop = Math.max(0, (line - 1) * lh - ed.clientHeight / 3);
+    updatePos();
+  });
+};
+var fontSize = +(pref('font') || 13.5);
+function applyFont() { ed.style.fontSize = fontSize + 'px'; }
+applyFont();
+$('bFont').onclick = function () {
+  choose('Betűméret', [11, 12, 13.5, 15, 17, 19].map(function (s) { return { label: s + ' px' + (s === fontSize ? '  ✓' : ''), value: s }; }))
+    .then(function (s) { if (s) { fontSize = s; pref('font', s); applyFont(); } });
+};
+$('bHelp').onclick = function () {
+  modal('<h2>Vivid 2.0 gyorssúgó</h2><div id="help">' + HELP + '</div><div class="row"><button class="primary" onclick="closeModal()">Bezár</button></div>');
+};
+
+// ------------------------------------------------------------------ import (ZIP + plain files)
+function inflateRaw(src) {
+  var pos = 0, bitbuf = 0, bitcnt = 0, out = new Uint8Array(Math.max(1024, src.length * 4)), op = 0;
+  function need(n) { if (op + n > out.length) { var nb = new Uint8Array(Math.max(out.length * 2, op + n)); nb.set(out); out = nb; } }
+  function bits(n) {
+    while (bitcnt < n) { if (pos >= src.length) throw new Error('csonka adat'); bitbuf |= src[pos++] << bitcnt; bitcnt += 8; }
+    var v = bitbuf & ((1 << n) - 1); bitbuf >>>= n; bitcnt -= n; return v;
+  }
+  function huff(lengths, n) {
+    var count = new Uint16Array(16), symbol = new Uint16Array(n), offs = new Uint16Array(16), i;
+    for (i = 0; i < n; i++) count[lengths[i]]++;
+    count[0] = 0;
+    for (i = 1; i < 16; i++) offs[i] = offs[i - 1] + count[i - 1];
+    for (i = 0; i < n; i++) if (lengths[i]) symbol[offs[lengths[i]]++] = i;
+    return { count: count, symbol: symbol };
+  }
+  function decode(h) {
+    var code = 0, first = 0, index = 0;
+    for (var l = 1; l < 16; l++) {
+      code |= bits(1); var c = h.count[l];
+      if (code - c < first) return h.symbol[index + (code - first)];
+      index += c; first += c; first <<= 1; code <<= 1;
+    }
+    throw new Error('hibás Huffman-kód');
+  }
+  var LB = [3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,35,43,51,59,67,83,99,115,131,163,195,227,258];
+  var LE = [0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0];
+  var DB = [1,2,3,4,5,7,9,13,17,25,33,49,65,97,129,193,257,385,513,769,1025,1537,2049,3073,4097,6145,8193,12289,16385,24577];
+  var DE = [0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13];
+  var fixedL, fixedD;
+  function codes(lh, dh) {
+    for (;;) {
+      var sym = decode(lh);
+      if (sym < 256) { need(1); out[op++] = sym; }
+      else if (sym === 256) return;
+      else {
+        sym -= 257; if (sym >= 29) throw new Error('hibás hossz');
+        var L = LB[sym] + bits(LE[sym]);
+        var ds = decode(dh); if (ds >= 30) throw new Error('hibás távolság');
+        var d = DB[ds] + bits(DE[ds]);
+        if (d > op) throw new Error('túl nagy távolság');
+        need(L);
+        for (var i = 0; i < L; i++) { out[op] = out[op - d]; op++; }
+      }
+    }
+  }
+  var last;
+  do {
+    last = bits(1);
+    var type = bits(2);
+    if (type === 0) {
+      bitbuf = 0; bitcnt = 0;
+      var len = src[pos] | (src[pos + 1] << 8); pos += 4;
+      need(len); out.set(src.subarray(pos, pos + len), op); op += len; pos += len;
+    } else if (type === 1) {
+      if (!fixedL) {
+        var l = new Uint8Array(288), i;
+        for (i = 0; i < 144; i++) l[i] = 8; for (; i < 256; i++) l[i] = 9; for (; i < 280; i++) l[i] = 7; for (; i < 288; i++) l[i] = 8;
+        fixedL = huff(l, 288);
+        var dl = new Uint8Array(30); for (i = 0; i < 30; i++) dl[i] = 5; fixedD = huff(dl, 30);
+      }
+      codes(fixedL, fixedD);
+    } else if (type === 2) {
+      var nlen = bits(5) + 257, ndist = bits(5) + 1, ncode = bits(4) + 4;
+      var ORD = [16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15];
+      var lens = new Uint8Array(320), j;
+      for (j = 0; j < ncode; j++) lens[ORD[j]] = bits(3);
+      var lencode = huff(lens, 19);
+      var all = new Uint8Array(nlen + ndist); j = 0;
+      while (j < nlen + ndist) {
+        var s = decode(lencode);
+        if (s < 16) all[j++] = s;
+        else {
+          var rep, val = 0;
+          if (s === 16) { if (!j) throw new Error('hibás ismétlés'); val = all[j - 1]; rep = 3 + bits(2); }
+          else if (s === 17) rep = 3 + bits(3); else rep = 11 + bits(7);
+          while (rep--) all[j++] = val;
+        }
+      }
+      codes(huff(all.subarray(0, nlen), nlen), huff(all.subarray(nlen), ndist));
+    } else throw new Error('hibás blokktípus');
+  } while (!last);
+  return out.subarray(0, op);
+}
+function unzip(buf) {
+  var b = new Uint8Array(buf), dv = new DataView(buf), res = [];
+  var e = -1;
+  for (var i = b.length - 22; i >= Math.max(0, b.length - 65557); i--) if (dv.getUint32(i, true) === 0x06054b50) { e = i; break; }
+  if (e < 0) throw new Error('nem ZIP fájl');
+  var cnt = dv.getUint16(e + 10, true), off = dv.getUint32(e + 16, true);
+  for (var k = 0; k < cnt; k++) {
+    if (dv.getUint32(off, true) !== 0x02014b50) throw new Error('sérült ZIP könyvtár');
+    var method = dv.getUint16(off + 10, true), csize = dv.getUint32(off + 20, true);
+    var nlen = dv.getUint16(off + 28, true), xlen = dv.getUint16(off + 30, true), clen = dv.getUint16(off + 32, true);
+    var loff = dv.getUint32(off + 42, true);
+    var name = ''; for (var c = 0; c < nlen; c++) name += String.fromCharCode(b[off + 46 + c]);
+    off += 46 + nlen + xlen + clen;
+    if (/\/$/.test(name)) continue;
+    var ds = loff + 30 + dv.getUint16(loff + 26, true) + dv.getUint16(loff + 28, true);
+    var raw = b.subarray(ds, ds + csize), data;
+    try {
+      if (method === 0) data = raw; else if (method === 8) data = inflateRaw(raw); else { res.push({ name: name, error: 'nem támogatott tömörítés (' + method + ')' }); continue; }
+    } catch (er) { res.push({ name: name, error: er.message }); continue; }
+    res.push({ name: name, data: data });
+  }
+  return res;
+}
+var TEXT_EXT = { v: 1, vo: 1, vc: 1, vs: 1, map: 1, doc: 1, txt: 1, inc: 1, me: 1, '1st': 1, diz: 1 };
+var dec;
+try { dec = new TextDecoder('windows-1252'); } catch (e) { dec = null; }
+function bytesToText(u8) {
+  if (dec) return dec.decode(u8).replace(/\x1a[\s\S]*$/, '');
+  var s = ''; for (var i = 0; i < u8.length; i++) s += String.fromCharCode(u8[i]); return s.replace(/\x1a[\s\S]*$/, '');
+}
+function importEntries(entries, report) {
+  entries.forEach(function (en) {
+    var base = en.name.replace(/^.*[\\\/]/, '').toLowerCase();
+    if (en.error) { report.skipped.push(base + ' (' + en.error + ')'); return; }
+    var e = ext(base);
+    if (e === 'zip') { try { importEntries(unzip(en.data.slice().buffer), report); } catch (er) { report.skipped.push(base + ' (' + er.message + ')'); } return; }
+    if (!TEXT_EXT[e] && e !== '') { report.skipped.push(base); return; }
+    if (!validName(base)) { report.skipped.push(base + ' (érvénytelen név)'); return; }
+    if (store.write(base, bytesToText(en.data))) report.ok.push(base); else report.skipped.push(base + ' (írási hiba)');
+  });
+}
+$('bImport').onclick = function () { $('fileIn').value = ''; $('fileIn').click(); };
+$('fileIn').onchange = function () {
+  var files = Array.prototype.slice.call(this.files || []);
+  if (!files.length) return;
+  var report = { ok: [], skipped: [] };
+  var pending = files.length;
+  files.forEach(function (f) {
+    var fr = new FileReader();
+    fr.onload = function () {
+      var name = f.name || 'fajl';
+      try {
+        if (/\.zip$/i.test(name) || (new Uint8Array(fr.result, 0, 2)[0] === 0x50 && new Uint8Array(fr.result, 0, 2)[1] === 0x4b)) importEntries(unzip(fr.result), report);
+        else importEntries([{ name: name, data: new Uint8Array(fr.result) }], report);
+      } catch (e) { report.skipped.push(name + ' (' + e.message + ')'); }
+      if (--pending === 0) importDone(report);
+    };
+    fr.onerror = function () { report.skipped.push(f.name + ' (olvasási hiba)'); if (--pending === 0) importDone(report); };
+    fr.readAsArrayBuffer(f);
+  });
+};
+function importDone(r) {
+  renderFiles();
+  if (cur && r.ok.indexOf(cur) >= 0 && !isDirty()) { curSaved = store.read(cur); ed.value = curSaved; updateHeader(); }
+  var msg = r.ok.length + ' fájl importálva' + (r.ok.length ? ':\n' + r.ok.join(', ') : '.');
+  if (r.skipped.length) msg += '\n\nKihagyva (' + r.skipped.length + '): ' + r.skipped.join(', ');
+  modal('<h2>Importálás kész</h2><p class="msg">' + esc(msg) + '</p><div class="row"><button class="primary" onclick="closeModal()">OK</button></div>');
+}
+
+// ------------------------------------------------------------------ export
+function exportText(n, content) {
+  if (window.Android && Android.exportText) {
+    var r = Android.exportText(n, content || '');
+    toast(r ? 'Mentve: ' + r : 'Exportálási hiba', 3500);
+  } else downloadBlob(n, new Blob([content], { type: 'text/plain' }));
+}
+function downloadBlob(n, blob) {
+  var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = n; document.body.appendChild(a); a.click(); a.remove();
+}
+$('bPng').onclick = function () {
+  if (!renderedName) { toast('Előbb renderelj!'); return; }
+  var name = renderedName.replace(/\.[^.]*$/, '') + '_' + new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14) + '.png';
+  var url = $('cv').toDataURL('image/png');
+  if (window.Android && Android.saveImage) {
+    var r = Android.saveImage(name, url.substring(url.indexOf(',') + 1));
+    toast(r ? 'Mentve: ' + r : 'Mentési hiba', 3500);
+  } else { var a = document.createElement('a'); a.href = url; a.download = name; a.click(); }
+};
+
+// ------------------------------------------------------------------ rendering
+var RSRC = $('renderer-src').textContent;
+var worker = null, workerOK = null, rendering = false, renderedName = null, mainThreadJob = null;
+var cv = $('cv'), ctx = cv.getContext('2d');
+var rStart = 0, rRange = [0, 1];
+
+function getWorker() {
+  if (workerOK === false) return null;
+  if (worker) return worker;
+  try {
+    var url = URL.createObjectURL(new Blob([RSRC], { type: 'application/javascript' }));
+    worker = new Worker(url);
+    worker.onmessage = function (e) { onRenderMsg(e.data); };
+    worker.onerror = function (e) {
+      if (e && e.preventDefault) e.preventDefault();
+      workerFailed();
+    };
+    return worker;
+  } catch (e) { workerOK = false; return null; }
+}
+function workerFailed() {
+  // worker could not run: fall back to the main thread
+  var wasWaiting = rendering && workerOK === null;
+  workerOK = false; try { worker.terminate(); } catch (e) {}
+  worker = null;
+  if (wasWaiting && lastJob) runMainThread(lastJob);
+}
+var lastJob = null;
+
+function collectFiles() {
+  var files = {};
+  fileList().forEach(function (n) { var c = n === cur ? ed.value : store.read(n); if (c != null) files[n] = c; });
+  return files;
+}
+function renderOpts() {
+  var o = { squarePixels: $('oSquare').checked, noShadows: $('oNoShadow').checked };
+  var r = $('oRes').value; if (r !== 'studio') o.res = r.split('x').map(Number);
+  var a = $('oAA').value; if (a !== 'studio') o.antialias = a;
+  return o;
+}
+['oRes', 'oAA', 'oSquare', 'oNoShadow'].forEach(function (id) {
+  var el = $(id), v = pref('opt:' + id);
+  if (v !== null) { if (el.type === 'checkbox') el.checked = v === '1'; else el.value = v; }
+  el.onchange = function () { pref('opt:' + id, el.type === 'checkbox' ? (el.checked ? '1' : '0') : el.value); };
+});
+
+function startRender() {
+  if (rendering) return;
+  var target = cur && isScene(cur) ? cur : lastScene;
+  if (!target || store.read(target) == null && target !== cur) {
+    var scenes = fileList().filter(isScene);
+    target = scenes[0];
+  }
+  if (!target) { toast('Nincs renderelhető .v fájl'); return; }
+  renderedName = target;
+  var job = { cmd: 'render', files: collectFiles(), main: target, opts: renderOpts() };
+  lastJob = job;
+  rendering = true; setRenderUI(true);
+  $('imginfo').textContent = 'Feldolgozás: ' + target + ' …';
+  $('prog').firstChild.style.width = '0';
+  logClear();
+  rStart = Date.now();
+  var w = getWorker();
+  if (w) { try { w.postMessage(job); } catch (e) { workerFailed(); } }
+  else runMainThread(job);
+}
+function stopRender() {
+  if (!rendering) return;
+  if (mainThreadJob) { mainThreadJob.cancel = true; }
+  else if (worker) { worker.terminate(); worker = null; }
+  rendering = false; setRenderUI(false);
+  $('imginfo').textContent += ' — megszakítva';
+}
+function setRenderUI(on) {
+  $('bStop').disabled = !on; $('bRender2').disabled = on; $('bRender').disabled = on;
+  $('bRender').textContent = on ? '…' : '▶';
+}
+$('bRender').onclick = function () { show('image'); startRender(); };
+$('bRender2').onclick = startRender;
+$('bStop').onclick = stopRender;
+var zoomFull = false;
+$('bZoom').onclick = function () { zoomFull = !zoomFull; cv.classList.toggle('full', zoomFull); $('bZoom').textContent = zoomFull ? 'Kitölt' : '1:1'; };
+
+var rowImg = null, stats = null;
+function onRenderMsg(m) {
+  if (m.type !== 'error' && workerOK === null) workerOK = true;
+  switch (m.type) {
+    case 'error':
+      rendering = false; setRenderUI(false);
+      (m.warnings || []).forEach(function (w) { logLine('warn', w); });
+      logLine('err', (m.file ? m.file + ':' + m.line + ': ' : '') + m.msg, m.file, m.line);
+      $('imginfo').textContent = 'Hiba: ' + m.msg;
+      show('log');
+      break;
+    case 'start':
+      cv.width = m.w; cv.height = m.h;
+      ctx.fillStyle = '#000'; ctx.fillRect(0, 0, m.w, m.h);
+      rowImg = ctx.createImageData(m.w, 1);
+      rRange = [m.y0, m.y1];
+      stats = m;
+      (m.warnings || []).forEach(function (w) { logLine('warn', w); });
+      logLine('ok', renderedName + ': ' + m.w + '×' + m.h + ', ' + m.prims + ' primitív, ' + m.lights + ' fény, élsimítás: ' + m.aa);
+      $('imginfo').textContent = renderedName + ' — ' + m.w + '×' + m.h + ' — renderelés…';
+      break;
+    case 'rows':
+      var data = new Uint8ClampedArray(m.data);
+      if (rowImg.data.length !== data.length) rowImg = ctx.createImageData(cv.width, m.n);
+      rowImg.data.set(data);
+      ctx.putImageData(rowImg, 0, m.y);
+      break;
+    case 'progress':
+      var f = (m.y - rRange[0]) / Math.max(1, rRange[1] - rRange[0]);
+      $('prog').firstChild.style.width = (f * 100).toFixed(1) + '%';
+      $('imginfo').textContent = renderedName + ' — ' + cv.width + '×' + cv.height + ' — ' + Math.round(f * 100) + '% — ' + (m.ms / 1000).toFixed(1) + ' s';
+      break;
+    case 'done':
+      rendering = false; setRenderUI(false); mainThreadJob = null;
+      $('prog').firstChild.style.width = '100%';
+      $('imginfo').textContent = renderedName + ' — ' + cv.width + '×' + cv.height + ' — kész: ' + (m.ms / 1000).toFixed(1) + ' s, ' + m.rays.toLocaleString('hu') + ' sugár';
+      logLine('ok', 'Kész: ' + (m.ms / 1000).toFixed(1) + ' s, ' + m.rays + ' sugár, ' + m.shadow + ' árnyéksugár');
+      break;
+    case 'cancelled':
+      rendering = false; setRenderUI(false); mainThreadJob = null;
+      break;
+  }
+}
+
+var core = null;
+function runMainThread(job) {
+  if (!core) { (new Function(RSRC))(); core = window.VividCore; }
+  var scene, r;
+  try { scene = core.parseScene(job.files, job.main); r = new core.Renderer(scene, job.opts); }
+  catch (e) { onRenderMsg({ type: 'error', msg: e.message || String(e), file: e.file, line: e.line, warnings: scene ? scene.warnings : [] }); return; }
+  var rr = r.rowRange();
+  onRenderMsg({ type: 'start', w: r.W, h: r.H, y0: rr[0], y1: rr[1], warnings: scene.warnings, prims: scene.prims.length, lights: scene.lights.length, aa: r.aa });
+  var y = rr[0], st = {}, t0 = Date.now();
+  var J = mainThreadJob = { cancel: false };
+  (function step() {
+    if (J.cancel) { onRenderMsg({ type: 'cancelled' }); return; }
+    var t1 = Date.now();
+    try {
+      while (y < rr[1] && Date.now() - t1 < 40) { var b = r.renderRows(y, y + 1, st); onRenderMsg({ type: 'rows', y: y, n: 1, data: b.buffer }); y++; }
+    } catch (e) { onRenderMsg({ type: 'error', msg: 'Renderelési hiba: ' + e.message }); return; }
+    onRenderMsg({ type: 'progress', y: y, ms: Date.now() - t0 });
+    if (y < rr[1]) setTimeout(step, 0); else onRenderMsg({ type: 'done', ms: Date.now() - t0, rays: r.rays, shadow: r.shadowRays });
+  })();
+}
+
+// ------------------------------------------------------------------ log
+var errCount = 0;
+function logClear() { $('log').innerHTML = ''; errCount = 0; $('logbadge').innerHTML = ''; }
+function logLine(kind, text, file, line) {
+  var d = document.createElement('div'); d.className = 'ln ' + kind;
+  var m = /^([^\s:]+):(\d+): (.*)$/.exec(text);
+  if (!file && m) { file = m[1]; line = +m[2]; }
+  if (file && line) {
+    d.innerHTML = '<a href="#">' + esc(file + ':' + line) + '</a> ' + esc(m ? m[3] : text.replace(file + ':' + line + ': ', ''));
+    d.querySelector('a').onclick = function (e) { e.preventDefault(); openFile(realName(file), line).then(function (ok) { if (ok) gotoLine(line); }); };
+  } else d.textContent = text;
+  $('log').appendChild(d);
+  if (kind === 'err' || kind === 'warn') { errCount++; $('logbadge').innerHTML = '<span class="badge">' + errCount + '</span>'; }
+}
+function realName(n) { var l = n.toLowerCase(); return fileList().filter(function (x) { return x.toLowerCase() === l; })[0] || n; }
+$('bClearLog').onclick = logClear;
+
+// ------------------------------------------------------------------ back button (called from Android)
+window.onAndroidBack = function () {
+  if ($('modal').classList.contains('on')) { closeModal(null); return; }
+  if (currentView !== 'files') { show('files'); return; }
+  guardUnsaved().then(function (ok) { if (ok && window.Android && Android.exitApp) Android.exitApp(); });
+};
+
+// ------------------------------------------------------------------ texts
+var TEMPLATE = '// új jelenet\n\nstudio {\n    from 0 -10 3\n    at 0 0 1\n    up 0 0 1\n    angle 35\n    resolution 320 200\n    aspect 1.6\n    ambient 0.15 0.15 0.15\n    background 0.2 0.3 0.6\n    antialias adaptive\n}\n\nlight {\n    type point\n    position 10 -10 15\n    color 1 1 1\n}\n\nsurface {\n    diffuse 0.6 0.6 0.6\n}\nring { center 0 0 0  normal 0 0 1  radius 50 }\n\nsurface {\n    diffuse 0.8 0.2 0.1\n    shine 40 1 1 1\n}\nsphere { center 0 0 1  radius 1 }\n';
+var HELP = [
+  '<p>Jobbkezes koordináták, általában <code>up 0 0 1</code> (Z felfelé). Színek: r g b 0..1. Megjegyzés: <code>//</code> és <code>/* */</code>. Kisbetű-nagybetű érzékeny.</p>',
+  '<h4>Előfeldolgozó</h4><pre>#include color.vc\n#define PIROS (1 0 0)\n#define MUANYAG surface { diffuse PIROS \\\n  shine 20 (1 1 1) }\n#undef PIROS</pre>',
+  '<h4>studio</h4><pre>from x y z   at x y z   up x y z\nangle fok   resolution w h   aspect a\nprojection flat|spherical|orthographic|parallax\nwidth w (orthographic)   start s  stop s\nambient rgb   background rgb | { pal.map up xyz }\nhaze h   antialias none|quick|corners|adaptive\nthreshold 0..255   jitter   depth n\naperture a  focal_length f  samples n\nno_shadows   no_exp_trans</pre>',
+  '<h4>light</h4><pre>type point|directional|spherical|spot\nposition xyz  color rgb  falloff 0|1|2\ndirection xyz  (vagy from/at)\nradius r  samples n   (spherical)\nmin_angle a  max_angle a  at xyz (spot)\nno_shadows  no_spec</pre>',
+  '<h4>surface</h4><pre>diffuse rgb  ambient rgb  specular rgb\nshine pow [rgb]  transparent rgb  ior n\nfuzz f  no_antialias\ntexture { pattern checker|noise|spherical\n  scale s|xyz  offset xyz  fuzz f  blend b\n  terms n  surface {…}  surface {…} }\nbump { wave { center xyz wavelength w\n  amplitude a damping d phase p }\n  turbulence { scale s amp a terms n } }</pre>',
+  '<h4>Primitívek</h4><pre>sphere  { center xyz  radius r }\nring    { center xyz  normal xyz\n          radius r | min_radius a max_radius b }\npolygon { points n  vertex xyz … }\npatch   { vertex xyz normal xyz  ×3 }\ncone    { base xyz base_radius r\n          apex xyz apex_radius r }   (radius r = henger)</pre>',
+  '<h4>Transzformáció, vágás</h4><pre>transform { scale s|xyz  rotate x y z  translate xyz }\n  … primitívek …\ntransform_pop\n\nsphere { … clip { center xyz normal xyz } }\nclip { center xyz radius r inside|outside }\nclip { apex xyz apex_radius r base xyz\n       base_radius r inside|outside }\nglobal_clip { clip {…} }  …  clip_pop</pre>',
+  '<h4>Kifejezések</h4><pre>(1 + 2) * 3   sin() cos() tan() asin() acos()\natan() sqrt() pow(x y)\nvektor: a b c + x y z,  v * n,  cross, dot</pre>',
+  '<p style="color:var(--muted)">A sík-vágás a normális felőli részt tartja meg. A trigonometrikus függvények radiánt várnak.</p>'
+].join('');
+
+// ------------------------------------------------------------------ boot
+(function boot() {
+  if (!store.list().length) installSamples(false);
+  else if (pref('samplesV') !== '1') { for (var k in SAMPLES) if (store.read(k) == null) store.write(k, SAMPLES[k]); }
+  pref('samplesV', '1');
+  renderFiles();
+  var last = pref('lastOpen');
+  if (last && store.read(last) != null) openFile(last);
+  else { var s = fileList().filter(isScene)[0]; if (s) openFile(s); }
+  updateHeader();
+})();
+</script>
+</body>
+</html>
