@@ -9,7 +9,7 @@ WebView-alapú Android szerkesztővel.
 - `web/app.html`: szerkesztő UI (fájllista, szerkesztés, mentés, renderelés, ZIP import, PNG export)
 - `samples/`: saját mintafájlok
 - `android/`: manifest, smali forrás (MainActivity, Chrome, Bridge), build_apk.sh, apksign.py (v2 aláírás)
-- `keys/`: az APK aláírókulcsa – frissítéshez ugyanezzel kell aláírni. Ne tedd közzé.
+
 
 Build: `bash android/build_apk.sh` (aapt2, android.jar, smali jar kell; útvonalak a szkript elején).
 Tesztek: `node test/render.js samples alap.v out.png`, `python3 test/ui_test.py`.
